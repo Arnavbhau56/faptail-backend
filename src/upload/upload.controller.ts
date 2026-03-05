@@ -1,36 +1,28 @@
 import { Controller, Post, UseInterceptors, UploadedFile, UploadedFiles } from '@nestjs/common'
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express'
-import { diskStorage } from 'multer'
-import { extname } from 'path'
+import { memoryStorage } from 'multer'
 
 @Controller('upload')
 export class UploadController {
   @Post('logo')
   @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads/logos',
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-        cb(null, `logo-${uniqueSuffix}${extname(file.originalname)}`)
-      }
-    })
+    storage: memoryStorage()
   }))
   uploadLogo(@UploadedFile() file: any) {
-    return { url: `/uploads/logos/${file.filename}` }
+    const base64 = file.buffer.toString('base64')
+    const dataUrl = `data:${file.mimetype};base64,${base64}`
+    return { url: dataUrl }
   }
 
   @Post('hero')
   @UseInterceptors(FilesInterceptor('files', 10, {
-    storage: diskStorage({
-      destination: './uploads/hero',
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-        cb(null, `hero-${uniqueSuffix}${extname(file.originalname)}`)
-      }
-    })
+    storage: memoryStorage()
   }))
   uploadHero(@UploadedFiles() files: any[]) {
-    const urls = files.map(file => `/uploads/hero/${file.filename}`)
+    const urls = files.map(file => {
+      const base64 = file.buffer.toString('base64')
+      return `data:${file.mimetype};base64,${base64}`
+    })
     return { urls }
   }
 }

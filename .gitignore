@@ -46,6 +46,9 @@ lerna-debug.log*
 .temp
 .tmp
 
+# Invoices (generated dynamically)
+/uploads/invoices/
+
 # Runtime data
 pids
 *.pid
