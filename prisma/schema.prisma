@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── TENANTS ───────────────────────────────────────────────
+model Tenant {
+  id                String   @id @default(uuid())
+  slug              String   @unique
+  name              String
+  domain            String   @unique
+  address           String?
+  city              String?
+  state             String?
+  pincode           String?
+  logo_url          String?
+  hero_images       String[] @default([])
+  gst_number        String?
+  invoice_prefix    String   @default("INV")
+  is_open           Boolean  @default(true)
+  platform_fee_pct  Float    @default(5.0)
+  delivery_fee_pct  Float    @default(0.0)
+  created_at        DateTime @default(now())
+  credits          Float  @default(0)
+  credit_per_order_pct Float  @default(1)
+  
+  credit_transactions CreditTransaction[]
+  products  Product[]
+  orders    Order[]
+  invoices  Invoice[]
+
+  @@map("tenants")
+}
+
+// ─── CATEGORIES ────────────────────────────────────────────
+model Category {
+  id          String    @id @default(uuid())
+  tenant_id   String
+  name        String
+  slug        String?
+  image       String?
+  sort_order  Int       @default(0)
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+
+  products    Product[]
+
+  @@map("categories")
+}
+
+// ─── PRODUCTS ──────────────────────────────────────────────
+model Product {
+  id           String   @id @default(uuid())
+  tenant_id    String
+  category_id  String?
+  name         String
+  description  String?
+  price        Float
+  image_url    String?
+  is_available Boolean  @default(true)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now())
+
+  tenant      Tenant    @relation(fields: [tenant_id], references: [id])
+  category    Category? @relation(fields: [category_id], references: [id])
+  order_items OrderItem[]
+
+  @@map("products")
+}
+
+// ─── ORDERS ────────────────────────────────────────────────
+model Order {
+  id                  String        @id @default(uuid())
+  tenant_id           String
+  order_number        String
+  customer_name       String
+  customer_phone      String
+  customer_email      String?
+  status              OrderStatus   @default(PENDING)
+  payment_status      PaymentStatus @default(PENDING)
+  razorpay_order_id   String?
+  razorpay_payment_id String?
+  subtotal            Float
+  platform_fee        Float         @default(0)
+  delivery_fee        Float         @default(0)
+  total_amount        Float
+  notes               String?
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+
+  tenant   Tenant      @relation(fields: [tenant_id], references: [id])
+  items    OrderItem[]
+  invoice  Invoice?
+
+  user_id    String?
+  user       User?   @relation(fields: [user_id], references: [id])
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  READY
+  SHIPPED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+// ─── ORDER ITEMS ───────────────────────────────────────────
+model OrderItem {
+  id          String  @id @default(uuid())
+  order_id    String
+  product_id  String
+  name        String           // snapshot at order time
+  price       Float            // snapshot at order time
+  quantity    Int
+  subtotal    Float
+
+  order    Order   @relation(fields: [order_id], references: [id])
+  product  Product @relation(fields: [product_id], references: [id])
+
+  @@map("order_items")
+}
+
+// ─── INVOICES ──────────────────────────────────────────────
+model Invoice {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  order_id       String   @unique
+  invoice_number String              // e.g. "H2-INV-0042"
+  pdf_path       String?             // local path or blob URL later
+  gst_number     String?
+  generated_at   DateTime @default(now())
+
+  tenant  Tenant @relation(fields: [tenant_id], references: [id])
+  order   Order  @relation(fields: [order_id], references: [id])
+
+  @@map("invoices")
+}
+// ─── USERS ──────────────────────────────────────────────
+model User {
+  id         String   @id @default(uuid())
+  tenant_id  String
+  phone      String
+  name       String?
+  created_at DateTime @default(now())
+
+  orders Order[]
+
+  @@unique([tenant_id, phone])
+  @@map("users")
+}
+
+model OTP {
+  id         String   @id @default(uuid())
+  tenant_id  String
+  phone      String
+  code       String
+  expires_at DateTime
+  used       Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@map("otps")
+}
+// ─── CREDIT ──────────────────────────────────────────────
+model CreditTransaction {
+  id         String     @id @default(uuid())
+  tenant_id  String
+  amount     Float
+  type       CreditType
+  order_id   String?
+  note       String?
+  created_at DateTime   @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@map("credit_transactions")
+}
+
+enum CreditType {
+  TOPUP
+  DEDUCTED
+  REFUNDED
+}
+// ─── ADMIN ──────────────────────────────────────────────
+model AdminUser {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  role      AdminRole
+  tenant_id String?   // null = superadmin, set = canteen admin
+  created_at DateTime @default(now())
+
+  @@map("admin_users")
+}
+
+enum AdminRole {
+  ADMIN
+  SUPERADMIN
+}
