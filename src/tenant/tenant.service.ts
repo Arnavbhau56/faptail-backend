@@ -9,6 +9,7 @@ export class TenantService {
     return this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
+        id: true,
         slug: true,
         name: true,
         address: true,
